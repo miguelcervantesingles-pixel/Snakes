@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESL Snakes & Ladders - Real-Time Multiplayer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@600;800;900&display=swap');
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: #f8fafc;
+            user-select: none;
+        }
+
+        .font-display {
+            font-family: 'Fredoka', cursive, sans-serif;
+        }
+
+        /* Board Styling */
+        .board-container {
+            position: relative;
+            width: 100%;
+            max-width: 680px;
+            aspect-ratio: 1 / 1;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(99, 102, 241, 0.3);
+            border-radius: 1rem;
+            overflow: hidden;
+            background-color: #1e293b;
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(10, 1fr);
+            width: 100%;
+            height: 100%;
+        }
+
+        .svg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .cell {
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding: 2px 4px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            transition: background 0.3s ease;
+        }
+
+        @media (min-width: 640px) {
+            .cell {
+                font-size: 0.85rem;
+                padding: 4px 6px;
+            }
+        }
+
+        .cell-even { background-color: rgba(30, 41, 59, 0.85); }
+        .cell-odd { background-color: rgba(15, 23, 42, 0.85); }
+
+        .cell-snake-head { background-color: rgba(239, 68, 68, 0.25) !important; }
+        .cell-ladder-bottom { background-color: rgba(34, 197, 94, 0.25) !important; }
+
+        .tokens-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .player-token {
+            position: absolute;
+            width: 7.5%;
+            height: 7.5%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            color: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.4);
+            transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 25;
+            border: 2px solid white;
+            font-size: 0.65rem;
+        }
+
+        @media (min-width: 640px) {
+            .player-token {
+                font-size: 0.8rem;
+                border-width: 2.5px;
+            }
+        }
+
+        /* 3D Dice Styling */
+        .dice-container {
+            perspective: 600px;
+            width: 64px;
+            height: 64px;
+        }
+
+        .dice {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .dice-face {
+            position: absolute;
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(145deg, #ffffff, #e2e8f0);
+            border-radius: 12px;
+            border: 2px solid #cbd5e1;
+            display: grid;
+            grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+            padding: 6px;
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .dot {
+            display: block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #0f172a;
+            align-self: center;
+            justify-self: center;
+        }
+        .dot.red { background-color: #ef4444; }
+
+        .face-1 { transform: rotateY(0deg) translateZ(32px); }
+        .face-2 { transform: rotateY(90deg) translateZ(32px); }
+        .face-3 { transform: rotateY(180deg) translateZ(32px); }
+        .face-4 { transform: rotateY(-90deg) translateZ(32px); }
+        .face-5 { transform: rotateX(90deg) translateZ(32px); }
+        .face-6 { transform: rotateX(-90deg) translateZ(32px); }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between p-2 sm:p-4">
+
+    <!-- HEADER -->
+    <header class="max-w-7xl mx-auto w-full flex flex-col md:flex-row justify-between items-center mb-4 gap-3">
+        <div class="flex items-center gap-3">
+            <div class="bg-gradient-to-tr from-indigo-500 to-purple-500 p-3 rounded-2xl shadow-lg">
+                <i class="fa-solid fa-users-rays text-3xl text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-display font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400">
+                    ESL Speaking Adventure
+                </h1>
+                <p class="text-xs sm:text-sm text-slate-400">Real-Time Multiplayer Snakes & Ladders (Up to 5 Players)</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap justify-center">
+            <div id="roomBadge" class="hidden px-3 py-2 rounded-xl glass-panel text-xs font-bold text-amber-400 flex items-center gap-2 border border-amber-500/30">
+                <i class="fa-solid fa-door-open"></i>
+                <span id="roomCodeDisplay">ROOM: ----</span>
+                <button id="copyLinkBtn" class="ml-1 text-slate-300 hover:text-white p-1" title="Copy Share Link">
+                    <i class="fa-solid fa-copy"></i>
+                </button>
+            </div>
+            <button id="soundToggleBtn" class="px-3 py-2 rounded-xl glass-panel hover:bg-slate-700 transition flex items-center gap-2 text-xs font-semibold">
+                <i class="fa-solid fa-volume-high text-indigo-400" id="soundIcon"></i>
+                <span id="soundText">Sound ON</span>
+            </button>
+            <button id="leaveRoomBtn" class="hidden px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold transition flex items-center gap-2 text-xs shadow-lg">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Leave Room</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN GAME BOARD & DASHBOARD -->
+    <main id="gameMain" class="max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-start my-auto hidden">
+        
+        <!-- LEFT PANEL: BOARD (7 Cols) -->
+        <div class="lg:col-span-7 flex flex-col items-center justify-center">
+            <div class="board-container" id="boardContainer">
+                <svg class="svg-overlay" id="boardSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div class="board-grid" id="boardGrid"></div>
+                <div class="tokens-layer" id="tokensLayer"></div>
+            </div>
+            
+            <div class="flex items-center justify-center gap-6 mt-3 text-xs text-slate-400">
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500/40 border border-emerald-400 inline-block"></span> Ladder Base (Climb Up)</span>
+                <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500/40 border border-rose-400 inline-block"></span> Snake Head (Slide Down)</span>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: GAME DASHBOARD (5 Cols) -->
+        <div class="lg:col-span-5 flex flex-col gap-4">
+            
+            <!-- CURRENT TURN PANEL -->
+            <div class="glass-panel p-5 rounded-2xl shadow-xl relative overflow-hidden">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Active Turn</span>
+                    <span id="turnCounter" class="text-xs font-extrabold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">Turn #1</span>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div id="activeAvatar" class="w-14 h-14 rounded-2xl bg-indigo-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg border-2 border-white/20">
+                        P1
+                    </div>
+                    <div>
+                        <h2 id="activePlayerName" class="text-2xl font-display font-bold text-white">Waiting...</h2>
+                        <p id="activePlayerStatus" class="text-xs text-slate-300">Preparing board</p>
+                    </div>
+                </div>
+
+                <!-- DICE ROLL BAR -->
+                <div class="mt-5 flex items-center justify-between bg-slate-900/60 p-4 rounded-xl border border-slate-800">
+                    <div class="flex items-center gap-4">
+                        <div class="dice-container">
+                            <div class="dice" id="dice3d">
+                                <div class="dice-face face-1"><div></div><div></div><div></div><div></div><div class="dot red"></div><div></div><div></div><div></div><div></div></div>
+                                <div class="dice-face face-2"><div class="dot"></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div class="dot"></div></div>
+                                <div class="dice-face face-3"><div class="dot"></div><div></div><div></div><div></div><div class="dot"></div><div></div><div></div><div></div><div class="dot"></div></div>
+                                <div class="dice-face face-4"><div class="dot"></div><div></div><div class="dot"></div><div></div><div></div><div></div><div class="dot"></div><div></div><div class="dot"></div></div>
+                                <div class="dice-face face-5"><div class="dot"></div><div></div><div class="dot"></div><div></div><div class="dot"></div><div></div><div class="dot"></div><div></div><div class="dot"></div></div>
+                                <div class="dice-face face-6"><div class="dot"></div><div></div><div class="dot"></div><div class="dot"></div><div></div><div class="dot"></div><div class="dot"></div><div></div><div class="dot"></div></div>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="block text-xs text-slate-400 font-semibold">Roll Result</span>
+                            <span id="diceValueText" class="text-xl font-black text-amber-400">Ready</span>
+                        </div>
+                    </div>
+
+                    <button id="rollBtn" disabled class="px-5 py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold rounded-xl shadow-lg transition transform active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+                        <i class="fa-solid fa-dice text-xl"></i>
+                        <span>ROLL DIE</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SCOREBOARD & PLAYERS -->
+            <div class="glass-panel p-4 rounded-2xl">
+                <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3 flex items-center justify-between">
+                    <span>Live Scoreboard</span>
+                    <i class="fa-solid fa-users text-indigo-400"></i>
+                </h3>
+                <div id="playersList" class="space-y-2">
+                    <!-- Dynamic player entries -->
+                </div>
+            </div>
+
+            <!-- ACTIVITY LOG -->
+            <div class="glass-panel p-4 rounded-2xl flex-1 flex flex-col max-h-48">
+                <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center justify-between">
+                    <span>Speaking Activity Log</span>
+                    <i class="fa-solid fa-list-check text-indigo-400"></i>
+                </h3>
+                <div id="gameLog" class="overflow-y-auto text-xs space-y-2 pr-1 flex-1">
+                    <p class="text-slate-500 italic">Room synchronized. Game ready!</p>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ENTRY / ROOM SETUP MODAL -->
+    <div id="roomEntryModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+        <div class="glass-panel max-w-md w-full p-6 rounded-3xl shadow-2xl border border-slate-700">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center mb-3 shadow-lg">
+                    <i class="fa-solid fa-gamepad text-3xl text-white"></i>
+                </div>
+                <h2 class="text-2xl font-display font-bold text-white">Multiplayer Speaking Game</h2>
+                <p class="text-xs text-slate-400 mt-1">Play live with up to 5 students on any device!</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Your Name</label>
+                    <input type="text" id="playerNameInput" placeholder="Enter student name..." class="w-full bg-slate-800 border border-slate-700 rounded-xl p-3 text-sm font-semibold text-white focus:outline-none focus:border-indigo-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">Select Avatar Color</label>
+                    <div class="grid grid-cols-5 gap-2" id="colorPicker">
+                        <!-- Color buttons generated dynamically -->
+                    </div>
+                </div>
+
+                <!-- HOST OPTIONS -->
+                <div id="hostConfigSection" class="pt-2 border-t border-slate-800 space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">ESL Difficulty Level</label>
+                        <select id="levelConfig" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                            <option value="MIXED">Mix All Levels</option>
+                            <option value="STARTER">Starter (A1-A2)</option>
+                            <option value="INTERMEDIATE">Intermediate (B1-B2)</option>
+                            <option value="ADVANCED">Advanced (C1-C2)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Speaking Timer</label>
+                        <select id="timerConfig" class="w-full bg-slate-800 border border-slate-700 rounded-xl p-2.5 text-xs font-semibold text-white focus:outline-none focus:border-indigo-500">
+                            <option value="45" selected>45 Seconds Standard</option>
+                            <option value="30">30 Seconds Fast</option>
+                            <option value="60">60 Seconds Detailed</option>
+                            <option value="0">Off (Unlimited)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- ROOM JOIN CODE INPUT (IF JOINING) -->
+                <div id="joinCodeSection" class="hidden">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1">Room Code</label>
+                    <input type="text" id="joinCodeInput" placeholder="e.g. SL-8392" class="w-full uppercase tracking-widest text-center font-mono bg-slate-800 border border-slate-700 rounded-xl p-3 text-base font-bold text-amber-400 focus:outline-none focus:border-amber-500">
+                </div>
+            </div>
+
+            <!-- ACTION BUTTONS -->
+            <div class="grid grid-cols-2 gap-3 mt-6">
+                <button id="createRoomBtn" class="py-3.5 px-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white font-black text-sm rounded-xl shadow-xl transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>CREATE ROOM</span>
+                </button>
+                <button id="joinRoomBtn" class="py-3.5 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-black text-sm rounded-xl transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>JOIN ROOM</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOBBY / WAITING MODAL -->
+    <div id="lobbyModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md hidden">
+        <div class="glass-panel max-w-md w-full p-6 rounded-3xl shadow-2xl border border-slate-700 text-center">
+            <span class="text-xs font-extrabold uppercase tracking-widest text-indigo-400 block mb-1">Waiting Lobby</span>
+            <h2 id="lobbyRoomTitle" class="text-3xl font-display font-black text-amber-400 tracking-wider mb-2">SL-8392</h2>
+            <p class="text-xs text-slate-400 mb-4">Share this code or link with up to 5 students to play!</p>
+
+            <div class="my-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 text-left">Connected Players (<span id="connectedCount">1</span>/5)</h4>
+                <div id="lobbyPlayersList" class="space-y-2">
+                    <!-- Dynamic lobby list -->
+                </div>
+            </div>
+
+            <div id="hostLobbyControls" class="mt-6">
+                <button id="startGameBtn" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-lg rounded-xl shadow-xl transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-play"></i>
+                    <span>START GAME NOW</span>
+                </button>
+            </div>
+            <div id="guestLobbyNotice" class="mt-4 text-xs text-slate-400 italic hidden">
+                Waiting for host to start the game...
+            </div>
+        </div>
+    </div>
+
+    <!-- SYNCHRONIZED SPEAKING PROMPT MODAL -->
+    <div id="questionModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md hidden">
+        <div class="glass-panel max-w-lg w-full p-6 sm:p-8 rounded-3xl shadow-2xl border border-indigo-500/30 transform transition-all scale-95" id="questionModalBox">
+            
+            <div class="flex items-center justify-between mb-4">
+                <span id="modalCategoryBadge" class="text-xs font-extrabold px-3 py-1.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 uppercase tracking-wider flex items-center gap-1.5">
+                    <i class="fa-solid fa-comments"></i> <span id="categoryName">Speaking Challenge</span>
+                </span>
+                <span id="modalSquareBadge" class="text-xs font-bold text-slate-400">
+                    Square #<span id="modalSquareNum">12</span>
+                </span>
+            </div>
+
+            <div class="flex items-center gap-3 mb-5 p-3 rounded-xl bg-slate-800/60 border border-slate-700">
+                <div id="modalPlayerAvatar" class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-white shadow-md">
+                    P1
+                </div>
+                <div>
+                    <h4 id="modalPlayerName" class="font-bold text-white text-base">Student's Turn</h4>
+                    <p class="text-xs text-slate-400">Read out loud and answer clearly in English!</p>
+                </div>
+            </div>
+
+            <div class="my-6 min-h-[100px] flex flex-col items-center justify-center text-center px-2">
+                <div class="text-3xl text-amber-400 mb-3"><i class="fa-solid fa-quote-left"></i></div>
+                <h3 id="questionText" class="text-xl sm:text-2xl font-display font-bold text-white leading-snug">
+                    "Loading prompt..."
+                </h3>
+            </div>
+
+            <div id="timerContainer" class="mb-6">
+                <div class="flex justify-between items-center text-xs font-bold text-slate-400 mb-1.5">
+                    <span><i class="fa-regular fa-clock text-amber-400 mr-1"></i> Speaking Time</span>
+                    <span id="timerText" class="text-amber-400">45s</span>
+                </div>
+                <div class="w-full h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                    <div id="timerProgress" class="h-full bg-gradient-to-r from-amber-400 to-rose-500 w-full transition-all duration-1000"></div>
+                </div>
+            </div>
+
+            <div id="promptControlBtns" class="grid grid-cols-2 gap-3">
+                <button id="failPromptBtn" class="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm transition flex items-center justify-center gap-2 border border-slate-700">
+                    <i class="fa-solid fa-xmark text-rose-400"></i>
+                    <span>Pass / Skip</span>
+                </button>
+                <button id="completePromptBtn" class="py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold text-sm shadow-lg transition flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Complete Turn</span>
+                </button>
+            </div>
+            <p id="promptGuestNotice" class="text-xs text-center text-slate-400 italic hidden mt-2">
+                Listening to active speaker...
+            </p>
+        </div>
+    </div>
+
+    <!-- VICTORY MODAL -->
+    <div id="victoryModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg hidden">
+        <div class="glass-panel max-w-md w-full p-8 rounded-3xl shadow-2xl border border-amber-500/50 text-center relative overflow-hidden">
+            <div class="w-24 h-24 bg-gradient-to-tr from-amber-400 to-yellow-300 rounded-3xl mx-auto flex items-center justify-center text-5xl text-slate-950 shadow-2xl mb-4 animate-bounce">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h2 class="text-3xl font-display font-black text-white mb-1">VICTORY!</h2>
+            <p id="winnerNameText" class="text-2xl font-bold text-amber-400 mb-4">Player Champion!</p>
+            <p class="text-sm text-slate-300 mb-6">Congratulations on completing the speaking board game!</p>
+            <button id="restartGameBtn" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-lg rounded-xl shadow-xl transition">
+                PLAY AGAIN
+            </button>
+        </div>
+    </div>
+
+    <!-- FIREBASE INITIALIZATION & SCRIPT LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        /* ================= 1. FIREBASE SETUP & ENVIRONMENT ================= */
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'esl-snakes-ladders';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+
+        let app, db, auth;
+        let currentUser = null;
+
+        if (firebaseConfig) {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } else {
+            console.error("Firebase configuration missing!");
+        }
+
+        /* ================= 2. CONSTANTS & GAME DATA ================= */
+        const SNAKES = { 16: 6, 47: 26, 49: 11, 56: 19, 62: 18, 64: 60, 87: 24, 93: 73, 95: 75, 98: 78 };
+        const LADDERS = { 4: 14, 9: 31, 20: 38, 28: 84, 40: 59, 51: 67, 63: 81, 71: 91, 77: 96 };
+
+        const PLAYER_COLORS = [
+            { id: 'rose', bg: 'bg-rose-500', hex: '#ef4444', name: 'Red' },
+            { id: 'indigo', bg: 'bg-indigo-500', hex: '#6366f1', name: 'Indigo' },
+            { id: 'emerald', bg: 'bg-emerald-500', hex: '#10b981', name: 'Emerald' },
+            { id: 'amber', bg: 'bg-amber-500', hex: '#f59e0b', name: 'Amber' },
+            { id: 'violet', bg: 'bg-violet-500', hex: '#8b5cf6', name: 'Purple' }
+        ];
+
+        const QUESTION_BANK = [
+            { level: "STARTER", cat: "Past Experience", q: "What did you eat for breakfast today? Describe it." },
+            { level: "STARTER", cat: "Past Experience", q: "Tell us about your favorite childhood toy or game." },
+            { level: "STARTER", cat: "Describe & Opinion", q: "What is your favorite season of the year and why?" },
+            { level: "STARTER", cat: "Describe & Opinion", q: "Describe your best friend in 3 sentences." },
+            { level: "STARTER", cat: "Would You Rather", q: "Would you rather live in a quiet village or a big city?" },
+            { level: "INTERMEDIATE", cat: "Would You Rather", q: "Would you rather speak all languages or talk to animals?" },
+            { level: "INTERMEDIATE", cat: "Future & Hypothetical", q: "If you won $1,000 today, what would you buy first?" },
+            { level: "INTERMEDIATE", cat: "Future & Hypothetical", q: "What job or career do you want in 5 years?" },
+            { level: "INTERMEDIATE", cat: "Describe & Opinion", q: "Is social media good or bad for teenagers? Give reasons." },
+            { level: "ADVANCED", cat: "Opinion & Debate", q: "Should AI be used in schools for grading assignments? Why or why not?" },
+            { level: "ADVANCED", cat: "Hypothetical Situation", q: "If you could travel 100 years into the future, what changes would you expect?" },
+            { level: "ADVANCED", cat: "Past Experience", q: "Describe a major challenge you faced recently and how you overcame it." }
+        ];
+
+        /* ================= 3. STATE ================= */
+        let state = {
+            roomId: null,
+            isHost: false,
+            localPlayerId: null,
+            selectedColorIdx: 0,
+            soundEnabled: true,
+            roomData: null,
+            unsubscribeRoom: null,
+            timerInterval: null
+        };
+
+        /* ================= 4. AUDIO SYNTH ================= */
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (!state.soundEnabled) return;
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+
+                if (type === 'roll') {
+                    osc.type = 'square'; osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(400, now + 0.15);
+                    gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                    osc.start(now); osc.stop(now + 0.15);
+                } else if (type === 'step') {
+                    osc.type = 'sine'; osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+                    gain.gain.setValueAtTime(0.15, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now); osc.stop(now + 0.08);
+                } else if (type === 'ladder') {
+                    osc.type = 'triangle'; osc.frequency.setValueAtTime(250, now);
+                    osc.frequency.linearRampToValueAtTime(700, now + 0.4);
+                    gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.4);
+                    osc.start(now); osc.stop(now + 0.4);
+                } else if (type === 'snake') {
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(500, now);
+                    osc.frequency.linearRampToValueAtTime(180, now + 0.5);
+                    gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                    osc.start(now); osc.stop(now + 0.5);
+                }
+            } catch(e) {}
+        }
+
+        /* ================= 5. UTILS & UI RENDERERS ================= */
+        function generateRoomCode() {
+            return 'SL-' + Math.floor(1000 + Math.random() * 9000);
+        }
+
+        function getCellCoords(num) {
+            const index = num - 1;
+            const rowFromBottom = Math.floor(index / 10);
+            const row = 9 - rowFromBottom;
+            const colInRow = index % 10;
+            const col = (rowFromBottom % 2 === 0) ? colInRow : 9 - colInRow;
+            return { row, col };
+        }
+
+        function initBoardGrid() {
+            const boardGrid = document.getElementById('boardGrid');
+            boardGrid.innerHTML = '';
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 10; col++) {
+                    const rowFromBottom = 9 - row;
+                    const colInRow = (rowFromBottom % 2 === 0) ? col : 9 - col;
+                    const cellNum = (rowFromBottom * 10) + colInRow + 1;
+
+                    const cell = document.createElement('div');
+                    cell.id = `cell-${cellNum}`;
+                    cell.className = `cell ${(row + col) % 2 === 0 ? 'cell-even' : 'cell-odd'}`;
+                    if (SNAKES[cellNum]) cell.classList.add('cell-snake-head');
+                    else if (LADDERS[cellNum]) cell.classList.add('cell-ladder-bottom');
+
+                    cell.innerHTML = `<span class="text-slate-400 font-black">${cellNum}</span>`;
+                    boardGrid.appendChild(cell);
+                }
+            }
+        }
+
+        function drawOverlayElements() {
+            const boardSvg = document.getElementById('boardSvg');
+            boardSvg.innerHTML = '';
+            const rect = boardSvg.getBoundingClientRect();
+            if (!rect.width) return;
+
+            const cellW = rect.width / 10;
+            const cellH = rect.height / 10;
+            const getCenter = (num) => {
+                const { row, col } = getCellCoords(num);
+                return { x: (col + 0.5) * cellW, y: (row + 0.5) * cellH };
+            };
+
+            // Draw Ladders
+            Object.entries(LADDERS).forEach(([start, end]) => {
+                const p1 = getCenter(parseInt(start));
+                const p2 = getCenter(parseInt(end));
+                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                group.setAttribute('opacity', '0.9');
+
+                const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line1.setAttribute('x1', p1.x - 7); line1.setAttribute('y1', p1.y);
+                line1.setAttribute('x2', p2.x - 7); line1.setAttribute('y2', p2.y);
+                line1.setAttribute('stroke', '#10b981'); line1.setAttribute('stroke-width', '4');
+
+                const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                line2.setAttribute('x1', p1.x + 7); line2.setAttribute('y1', p1.y);
+                line2.setAttribute('x2', p2.x + 7); line2.setAttribute('y2', p2.y);
+                line2.setAttribute('stroke', '#10b981'); line2.setAttribute('stroke-width', '4');
+
+                group.appendChild(line1); group.appendChild(line2);
+
+                for (let i = 1; i < 6; i++) {
+                    const t = i / 6;
+                    const rung = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    rung.setAttribute('x1', (p1.x - 7) + t * (p2.x - p1.x));
+                    rung.setAttribute('y1', p1.y + t * (p2.y - p1.y));
+                    rung.setAttribute('x2', (p1.x + 7) + t * (p2.x - p1.x));
+                    rung.setAttribute('y2', p1.y + t * (p2.y - p1.y));
+                    rung.setAttribute('stroke', '#34d399'); rung.setAttribute('stroke-width', '3');
+                    group.appendChild(rung);
+                }
+                boardSvg.appendChild(group);
+            });
+
+            // Draw Snakes
+            Object.entries(SNAKES).forEach(([head, tail]) => {
+                const p1 = getCenter(parseInt(head));
+                const p2 = getCenter(parseInt(tail));
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const midX = (p1.x + p2.x) / 2 + (p1.x > p2.x ? 25 : -25);
+                const midY = (p1.y + p2.y) / 2;
+                path.setAttribute('d', `M ${p1.x} ${p1.y} Q ${midX} ${midY} ${p2.x} ${p2.y}`);
+                path.setAttribute('stroke', '#ef4444'); path.setAttribute('stroke-width', '7');
+                path.setAttribute('fill', 'none'); path.setAttribute('opacity', '0.85');
+
+                const headCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                headCircle.setAttribute('cx', p1.x); headCircle.setAttribute('cy', p1.y);
+                headCircle.setAttribute('r', '7'); headCircle.setAttribute('fill', '#dc2626');
+
+                boardSvg.appendChild(path); boardSvg.appendChild(headCircle);
+            });
+        }
+
+        function renderColorPicker() {
+            const container = document.getElementById('colorPicker');
+            container.innerHTML = '';
+            PLAYER_COLORS.forEach((color, idx) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `w-10 h-10 rounded-xl ${color.bg} border-2 ${state.selectedColorIdx === idx ? 'border-white scale-110' : 'border-transparent opacity-60'} transition transform hover:scale-105`;
+                btn.onclick = () => {
+                    state.selectedColorIdx = idx;
+                    renderColorPicker();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        /* ================= 6. FIREBASE ACTIONS & SYNC ================= */
+
+        async function initAuth() {
+            if (!auth) return;
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                currentUser = auth.currentUser;
+                state.localPlayerId = currentUser.uid;
+            } catch(e) {
+                console.error("Auth Error:", e);
+            }
+        }
+
+        function getRoomDocRef(roomId) {
+            return doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomId);
+        }
+
+        async function createRoom() {
+            if (!currentUser) await initAuth();
+            const nameInput = document.getElementById('playerNameInput').value.trim() || 'Student Host';
+            const roomCode = generateRoomCode();
+            state.roomId = roomCode;
+            state.isHost = true;
+
+            const roomRef = getRoomDocRef(roomCode);
+            const initialData = {
+                code: roomCode,
+                hostId: currentUser.uid,
+                status: 'LOBBY', // LOBBY, PLAYING, FINISHED
+                level: document.getElementById('levelConfig').value,
+                timerSetting: parseInt(document.getElementById('timerConfig').value),
+                currentTurnIdx: 0,
+                turnCount: 1,
+                lastRoll: null,
+                activePrompt: null,
+                players: [{
+                    id: currentUser.uid,
+                    name: nameInput,
+                    colorIdx: state.selectedColorIdx,
+                    position: 1
+                }],
+                logs: ["Room created. Share code to join!"]
+            };
+
+            await setDoc(roomRef, initialData);
+            subscribeToRoom(roomCode);
+        }
+
+        async function joinRoom() {
+            if (!currentUser) await initAuth();
+            const nameInput = document.getElementById('playerNameInput').value.trim() || 'Student Player';
+            const roomCode = document.getElementById('joinCodeInput').value.trim().toUpperCase();
+            if (!roomCode) return;
+
+            state.roomId = roomCode;
+            state.isHost = false;
+
+            const roomRef = getRoomDocRef(roomCode);
+            const snap = await getDoc(roomRef);
+
+            if (!snap.exists()) {
+                alert("Room not found!");
+                return;
+            }
+
+            const rData = snap.data();
+            if (rData.players.length >= 5) {
+                alert("Room is full! Maximum 5 players.");
+                return;
+            }
+
+            // Add player if not already in list
+            let existingIdx = rData.players.findIndex(p => p.id === currentUser.uid);
+            if (existingIdx === -1) {
+                rData.players.push({
+                    id: currentUser.uid,
+                    name: nameInput,
+                    colorIdx: state.selectedColorIdx,
+                    position: 1
+                });
+                await updateDoc(roomRef, { players: rData.players });
+            }
+
+            subscribeToRoom(roomCode);
+        }
+
+        function subscribeToRoom(roomCode) {
+            if (state.unsubscribeRoom) state.unsubscribeRoom();
+            const roomRef = getRoomDocRef(roomCode);
+
+            state.unsubscribeRoom = onSnapshot(roomRef, (snapshot) => {
+                if (!snapshot.exists()) return;
+                const data = snapshot.data();
+                state.roomData = data;
+                syncUIWithRoomData(data);
+            }, (err) => console.error("Snapshot error:", err));
+        }
+
+        /* ================= 7. SYNC ENGINE ================= */
+
+        function syncUIWithRoomData(data) {
+            // Check host status
+            state.isHost = (data.hostId === currentUser?.uid);
+
+            // Update Header Room Code
+            document.getElementById('roomBadge').classList.remove('hidden');
+            document.getElementById('roomCodeDisplay').innerText = `ROOM: ${data.code}`;
+            document.getElementById('leaveRoomBtn').classList.remove('hidden');
+
+            // Handle Lobby vs Game Views
+            if (data.status === 'LOBBY') {
+                document.getElementById('roomEntryModal').classList.add('hidden');
+                document.getElementById('gameMain').classList.add('hidden');
+                document.getElementById('lobbyModal').classList.remove('hidden');
+
+                document.getElementById('lobbyRoomTitle').innerText = data.code;
+                document.getElementById('connectedCount').innerText = data.players.length;
+
+                // Render Lobby Player List
+                const list = document.getElementById('lobbyPlayersList');
+                list.innerHTML = '';
+                data.players.forEach((p, i) => {
+                    const c = PLAYER_COLORS[p.colorIdx];
+                    const item = document.createElement('div');
+                    item.className = 'flex items-center justify-between p-2.5 rounded-xl bg-slate-800/80 border border-slate-700';
+                    item.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-7 h-7 rounded-lg ${c.bg} flex items-center justify-center font-bold text-white text-xs">P${i+1}</div>
+                            <span class="font-bold text-sm text-white">${p.name} ${p.id === data.hostId ? '(Host)' : ''}</span>
+                        </div>
+                        <span class="text-xs text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> Ready</span>
+                    `;
+                    list.appendChild(item);
+                });
+
+                if (state.isHost) {
+                    document.getElementById('hostLobbyControls').classList.remove('hidden');
+                    document.getElementById('guestLobbyNotice').classList.add('hidden');
+                } else {
+                    document.getElementById('hostLobbyControls').classList.add('hidden');
+                    document.getElementById('guestLobbyNotice').classList.remove('hidden');
+                }
+                return;
+            }
+
+            // PLAYING STATUS
+            document.getElementById('roomEntryModal').classList.add('hidden');
+            document.getElementById('lobbyModal').classList.add('hidden');
+            document.getElementById('gameMain').classList.remove('hidden');
+
+            initBoardGrid();
+            drawOverlayElements();
+
+            // Render Pawns
+            renderPlayerPawns(data.players);
+
+            // Update Scoreboard & Current Turn
+            const currPlayer = data.players[data.currentTurnIdx];
+            const isMyTurn = currPlayer && (currPlayer.id === currentUser?.uid);
+
+            document.getElementById('turnCounter').innerText = `Turn #${data.turnCount}`;
+            if (currPlayer) {
+                document.getElementById('activePlayerName').innerText = currPlayer.name;
+                document.getElementById('activePlayerStatus').innerText = `On Square ${currPlayer.position}`;
+                const c = PLAYER_COLORS[currPlayer.colorIdx];
+                document.getElementById('activeAvatar').className = `w-14 h-14 rounded-2xl ${c.bg} flex items-center justify-center text-white text-2xl font-bold shadow-lg border-2 border-white/20`;
+                document.getElementById('activeAvatar').innerText = `P${data.currentTurnIdx + 1}`;
+            }
+
+            // Enable Roll Button only for Active Turn Player
+            const rollBtn = document.getElementById('rollBtn');
+            rollBtn.disabled = !isMyTurn || !!data.activePrompt;
+
+            if (data.lastRoll) {
+                document.getElementById('diceValueText').innerText = `Rolled ${data.lastRoll}`;
+            }
+
+            // Scoreboard Render
+            const sb = document.getElementById('playersList');
+            sb.innerHTML = '';
+            data.players.forEach((p, idx) => {
+                const c = PLAYER_COLORS[p.colorIdx];
+                const isCur = idx === data.currentTurnIdx;
+                const div = document.createElement('div');
+                div.className = `p-2.5 rounded-xl flex items-center justify-between border ${isCur ? 'bg-slate-800 border-indigo-500 shadow-md' : 'bg-slate-900/40 border-slate-800'}`;
+                div.innerHTML = `
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-7 h-7 rounded-lg ${c.bg} flex items-center justify-center text-white font-black text-xs">P${idx+1}</div>
+                        <span class="font-bold text-xs text-white">${p.name} ${p.id === currentUser?.uid ? '(You)' : ''}</span>
+                    </div>
+                    <span class="text-xs font-black px-2 py-0.5 rounded bg-slate-950 text-amber-400 border border-slate-800">Square ${p.position}</span>
+                `;
+                sb.appendChild(div);
+            });
+
+            // Activity Log Sync
+            const logBox = document.getElementById('gameLog');
+            logBox.innerHTML = '';
+            data.logs.slice(-8).reverse().forEach(log => {
+                const p = document.createElement('p');
+                p.className = 'text-slate-300 border-b border-slate-800/50 pb-1';
+                p.innerText = log;
+                logBox.appendChild(p);
+            });
+
+            // Active Question Modal Sync
+            if (data.activePrompt) {
+                openPromptModalSynced(data.activePrompt, currPlayer, isMyTurn || state.isHost);
+            } else {
+                document.getElementById('questionModal').classList.add('hidden');
+            }
+
+            // Check Win Condition
+            const winner = data.players.find(p => p.position === 100);
+            if (winner) {
+                document.getElementById('winnerNameText').innerText = `${winner.name} Wins!`;
+                document.getElementById('victoryModal').classList.remove('hidden');
+                if (typeof confetti === 'function') confetti({ particleCount: 100, spread: 70 });
+            }
+        }
+
+        function renderPlayerPawns(players) {
+            const tokensLayer = document.getElementById('tokensLayer');
+            tokensLayer.innerHTML = '';
+
+            players.forEach((player, idx) => {
+                const c = PLAYER_COLORS[player.colorIdx];
+                const token = document.createElement('div');
+                token.className = `player-token ${c.bg}`;
+                token.innerText = `P${idx+1}`;
+
+                const { row, col } = getCellCoords(player.position);
+                const sameCell = players.filter(p => p.position === player.position);
+                const posInCell = sameCell.findIndex(p => p.id === player.id);
+                const offX = (posInCell % 3) * 2;
+                const offY = Math.floor(posInCell / 3) * 2;
+
+                token.style.left = `${col * 10 + 1 + offX}%`;
+                token.style.top = `${row * 10 + 1 + offY}%`;
+                tokensLayer.appendChild(token);
+            });
+        }
+
+        /* ================= 8. GAMEPLAY ACTIONS ================= */
+
+        async function handleStartGame() {
+            if (!state.isHost) return;
+            const roomRef = getRoomDocRef(state.roomId);
+            await updateDoc(roomRef, {
+                status: 'PLAYING',
+                logs: ["🏁 Game started! Active turn: " + state.roomData.players[0].name]
+            });
+        }
+
+        async function handleRollDice() {
+            const data = state.roomData;
+            const currPlayer = data.players[data.currentTurnIdx];
+            if (currPlayer.id !== currentUser?.uid) return;
+
+            playSound('roll');
+            const roll = Math.floor(Math.random() * 6) + 1;
+
+            // Animate Dice
+            const dice3d = document.getElementById('dice3d');
+            dice3d.style.transform = `rotateX(${720 + Math.random()*360}deg) rotateY(${720 + Math.random()*360}deg)`;
+
+            setTimeout(async () => {
+                let targetPos = currPlayer.position + roll;
+                if (targetPos > 100) targetPos = 100 - (targetPos - 100); // Bounce back
+
+                // Auto Snakes or Ladders
+                let logMsg = `${currPlayer.name} rolled a ${roll} and moved to square ${targetPos}.`;
+                if (LADDERS[targetPos]) {
+                    logMsg += ` 🪜 Climbed ladder to ${LADDERS[targetPos]}!`;
+                    targetPos = LADDERS[targetPos];
+                    playSound('ladder');
+                } else if (SNAKES[targetPos]) {
+                    logMsg += ` 🐍 Slid down snake to ${SNAKES[targetPos]}!`;
+                    targetPos = SNAKES[targetPos];
+                    playSound('snake');
+                } else {
+                    playSound('step');
+                }
+
+                currPlayer.position = targetPos;
+                
+                // Select Question Prompt
+                const filteredQ = QUESTION_BANK.filter(q => data.level === 'MIXED' || q.level === data.level);
+                const prompt = filteredQ[(targetPos - 1) % filteredQ.length];
+
+                const roomRef = getRoomDocRef(state.roomId);
+                const newLogs = [...data.logs, logMsg];
+
+                await updateDoc(roomRef, {
+                    players: data.players,
+                    lastRoll: roll,
+                    activePrompt: { ...prompt, square: targetPos },
+                    logs: newLogs
+                });
+            }, 800);
+        }
+
+        function openPromptModalSynced(prompt, player, canControl) {
+            document.getElementById('modalCategoryBadge').innerText = prompt.cat;
+            document.getElementById('modalSquareNum').innerText = prompt.square;
+            document.getElementById('modalPlayerName').innerText = `${player.name}'s Turn`;
+            document.getElementById('modalPlayerAvatar').innerText = `P${state.roomData.currentTurnIdx + 1}`;
+            document.getElementById('questionText').innerText = `"${prompt.q}"`;
+
+            if (canControl) {
+                document.getElementById('promptControlBtns').classList.remove('hidden');
+                document.getElementById('promptGuestNotice').classList.add('hidden');
+            } else {
+                document.getElementById('promptControlBtns').classList.add('hidden');
+                document.getElementById('promptGuestNotice').classList.remove('hidden');
+            }
+
+            document.getElementById('questionModal').classList.remove('hidden');
+        }
+
+        async function handleCompletePrompt(success) {
+            const data = state.roomData;
+            const nextTurn = (data.currentTurnIdx + 1) % data.players.length;
+            const newTurnCount = nextTurn === 0 ? data.turnCount + 1 : data.turnCount;
+
+            const roomRef = getRoomDocRef(state.roomId);
+            await updateDoc(roomRef, {
+                currentTurnIdx: nextTurn,
+                turnCount: newTurnCount,
+                activePrompt: null,
+                logs: [...data.logs, `${data.players[data.currentTurnIdx].name} completed their turn!`]
+            });
+        }
+
+        /* ================= 9. EVENT LISTENERS ================= */
+
+        window.onload = async () => {
+            renderColorPicker();
+            await initAuth();
+
+            // Check URL for join room parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomParam = urlParams.get('room');
+            if (roomParam) {
+                document.getElementById('joinCodeInput').value = roomParam.toUpperCase();
+                document.getElementById('joinCodeSection').classList.remove('hidden');
+                document.getElementById('hostConfigSection').classList.add('hidden');
+            }
+
+            document.getElementById('createRoomBtn').addEventListener('click', createRoom);
+            document.getElementById('joinRoomBtn').addEventListener('click', () => {
+                const sec = document.getElementById('joinCodeSection');
+                if (sec.classList.contains('hidden')) {
+                    sec.classList.remove('hidden');
+                    document.getElementById('hostConfigSection').classList.add('hidden');
+                } else {
+                    joinRoom();
+                }
+            });
+
+            document.getElementById('startGameBtn').addEventListener('click', handleStartGame);
+            document.getElementById('rollBtn').addEventListener('click', handleRollDice);
+            document.getElementById('completePromptBtn').addEventListener('click', () => handleCompletePrompt(true));
+            document.getElementById('failPromptBtn').addEventListener('click', () => handleCompletePrompt(false));
+
+            document.getElementById('copyLinkBtn').addEventListener('click', () => {
+                const url = `${window.location.origin}${window.location.pathname}?room=${state.roomId}`;
+                navigator.clipboard.writeText(url);
+                alert("Room link copied to clipboard!");
+            });
+
+            document.getElementById('soundToggleBtn').addEventListener('click', () => {
+                state.soundEnabled = !state.soundEnabled;
+                document.getElementById('soundIcon').className = state.soundEnabled ? 'fa-solid fa-volume-high text-indigo-400' : 'fa-solid fa-volume-xmark text-slate-500';
+                document.getElementById('soundText').innerText = state.soundEnabled ? 'Sound ON' : 'Sound OFF';
+            });
+
+            document.getElementById('leaveRoomBtn').addEventListener('click', () => {
+                if (state.unsubscribeRoom) state.unsubscribeRoom();
+                window.location.href = window.location.pathname;
+            });
+
+            window.addEventListener('resize', drawOverlayElements);
+        };
+    </script>
+</body>
+</html>
